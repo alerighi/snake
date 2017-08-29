@@ -176,7 +176,7 @@ void _Noreturn quit_game()
 
 void game_lost() 
 {
-	PRINT_CENTER(-1, "You lost!");
+	PRINT_CENTER(-1, "You lose!");
 	if (score > high_score) {
 		high_score = score;
 		save_score();
