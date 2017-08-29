@@ -11,7 +11,7 @@
 #include <unistd.h>
 #include <signal.h>
 
-#define VERSION "1.1.0"
+#define VERSION "1.1.1"
 #define VERSIONSTRING "Snake v" VERSION " (c) 2017 Alessandro Righi"
 #define UP 1
 #define DOWN 2
@@ -176,7 +176,6 @@ void _Noreturn quit_game()
 
 void game_lost() 
 {
-	clear();
 	PRINT_CENTER(-1, "You lost!\n");
 	if (score > high_score) {
 		high_score = score;
