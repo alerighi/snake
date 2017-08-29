@@ -5,7 +5,7 @@ SOURCE=snake.c
 PREFIX=/usr/local/
 
 $(BINNAME): $(SOURCE)
-	$(CC) $(CFLAGS) $< -o $@ 
+	$(CC) $< -o $@ $(CFLAGS)
 
 clean:
 	rm $(BINNAME)
