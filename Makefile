@@ -2,7 +2,7 @@ CC=gcc
 CFLAGS=-O3 -lncurses -Wno-unused-result
 BINNAME=snake
 SOURCE=snake.c
-PREFIX=/usr/local/
+PREFIX=/usr/local
 
 $(BINNAME): $(SOURCE)
 	$(CC) $< -o $@ $(CFLAGS)
