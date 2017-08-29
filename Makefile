@@ -13,4 +13,4 @@ clean:
 
 install: $(BINNAME)
 	install -s $(BINNAME) $(PREFIX)/bin/
-	install $(MANPAGE) $(PREFIX)/share/man/man6 
+	install $(MANPAGE) $(PREFIX)/share/man/man6/
