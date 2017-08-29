@@ -1,0 +1,40 @@
+.TH SNAKE 6 Snake "Snake"
+.SH NAME
+snake \- ncurses snake game
+.SH SYNOPSIS
+.B tetris 
+[\fB-hv\fR]
+[\fB-d\fR \fIdifficulty\fR]
+.SH DESCRIPTION
+.B snake
+is a text based clone of the famous snake game written in a boring afternoon with ncurses.
+.SH HOW TO PLAY
+Use the arrow keys to move the snake. 
+
+If you hit the borders of the screen, or cross your tail, you lose the game. 
+
+Press 'p' to pause the game, and 'q' to quit. 
+
+There are 3 kind of object you can take:
+.IP \[bu] 2
+\fB$\fR  increases the lenght of your snake by one
+.IP \[bu] 
+\fB%\fR  increases the lenght of your snake by 15 
+.IP \[bu] 
+\fB*\fR  decreases the lenght of your snake by 25. If the snake is less long than 25, you lose the game.
+
+.SH OPTIONS
+.TP
+.BR \-h
+Display a short help message and exit
+.TP
+.BR \-v
+Display version string and exit
+.TP
+.BR \-d " " \fIdifficulty\fR
+Change difficulty, where difficulty could be easy, medium and hard (default medium)
+Display a short help message and exit
+.SH AUTHOR
+Alessandro Righi
+.SH COPYRIGHT
+This software is free software, relased under the terms of the MIT licence
