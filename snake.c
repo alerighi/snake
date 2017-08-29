@@ -176,13 +176,13 @@ void _Noreturn quit_game()
 
 void game_lost() 
 {
-	PRINT_CENTER(-1, "You lost!\n");
+	PRINT_CENTER(-1, "You lost!");
 	if (score > high_score) {
 		high_score = score;
 		save_score();
-		PRINT_CENTER(0, "Congratulations! New High Score %d!\n", score);
+		PRINT_CENTER(0, "Congratulations! New High Score %d!", score);
 	} else {
-		PRINT_CENTER(0, "Your score: %d\n", score);
+		PRINT_CENTER(0, "Your score: %d", score);
 	}
 	PRINT_CENTER(1, "Play new game ? (y/n)");
 	refresh();
