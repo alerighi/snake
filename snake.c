@@ -9,6 +9,7 @@
 #include <time.h> 
 #include <ncurses.h> 
 #include <unistd.h>
+#include <signal.h>
 
 #define VERSION "1.0.0"
 #define VERSIONSTRING "Snake v" VERSION " (c) 2017 Alessandro Righi"
