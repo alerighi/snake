@@ -11,7 +11,7 @@
 #include <unistd.h>
 #include <signal.h>
 
-#define VERSION "1.0.0"
+#define VERSION "1.1.0"
 #define VERSIONSTRING "Snake v" VERSION " (c) 2017 Alessandro Righi"
 #define UP 1
 #define DOWN 2
@@ -166,6 +166,14 @@ void init_game()
 	print_screen();	
 }
 
+void _Noreturn quit_game() 
+{
+	endwin();
+	printf("Game ended\n");
+	printf("You scored %d - high score is %d\n", score, high_score);
+	exit(EXIT_SUCCESS);
+}
+
 void game_lost() 
 {
 	clear();
@@ -186,8 +194,7 @@ void game_lost()
 			init_game();
 			return;
 		case 'n': 
-			endwin();
-			exit(EXIT_SUCCESS);
+			quit_game();
 		}
 	}
 }
@@ -269,7 +276,9 @@ void _Noreturn usage()
 		   "    -v                    version string\n"
 		   " * move the snake with arrow keys or wasd\n"
 		   " * space bar for extra speed (use with caution)\n"
-		   " * if you hit the borders of the screen, or your tail, you lose\n"
+		   " * q for quitting the game\n"
+		   " * p pause the game\n"
+		   " * if you hit the borders of the screen, or your tail, you lose\n"		   
 		   " * powerups:\n"
 		   "     $ - increase snake length by 1\n"
 		   "     %% - increase snake length by 15\n"
@@ -337,6 +346,13 @@ int main(int argc, char *argv[])
 				usleep(10000);
 			}
 			break;
+		case 'p': 
+			alarm(0);
+			while (getch() != 'p')
+				/* wait */;
+			break;
+		case 'q': 
+			quit_game();
 		}
 		advance();
 	}
