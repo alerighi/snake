@@ -347,6 +347,7 @@ int main(int argc, char *argv[])
 			}
 			break;
 		case 'p': 
+			PRINT_CENTER(0, "Game paused - press 'p' to resume");
 			alarm(0);
 			while (getch() != 'p')
 				/* wait */;
