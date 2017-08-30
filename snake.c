@@ -27,7 +27,6 @@
 #define EDGE_VERTICAL '|'
 #define EDGE_ORIZONTAL '-'
 #define MAX_POS 1024
-#define SCREEN ((char(*)[X]) screen)
 #define PRINT_CENTER(i, message, ...) mvprintw(Y/2+i, X/2 - strlen(message)/2, message, ##__VA_ARGS__)
 #define EASY 90000
 #define MEDIUM 60000
@@ -35,7 +34,7 @@
 
 static int direction;
 static int length;
-static int (*screen)[];
+static char screen[128][256];
 static int Y;
 static int X;
 static int level;
@@ -77,31 +76,31 @@ void add_powerup()
 	do {
 		x = rand() % COLS;
 		y = rand() % LINES;
-	} while (SCREEN[y][x] != SPACE);
+	} while (screen[y][x] != SPACE);
 
 	switch (rand() % 10) {
 	case 7:
-		SCREEN[y][x] = SUPER_POWERUP;	
+		screen[y][x] = SUPER_POWERUP;	
 		break;
 	case 3:
-		SCREEN[y][x] = BOMB;
+		screen[y][x] = BOMB;
 		add_powerup();
 		break;
 	default: 
-		SCREEN[y][x] = POWERUP;
+		screen[y][x] = POWERUP;
 	}
 }
 
 void remove_tail() 
 {
-	SCREEN[position[tail_pos].y][position[tail_pos].x] = SPACE;
+	screen[position[tail_pos].y][position[tail_pos].x] = SPACE;
 	tail_pos = (tail_pos + 1) % MAX_POS;
 }
 
 void add_head(struct point head) 
 {
-	SCREEN[position[head_pos].y][position[head_pos].x] = SNAKE_BODY;
-	SCREEN[head.y][head.x] = SNAKE_HEAD;	
+	screen[position[head_pos].y][position[head_pos].x] = SNAKE_BODY;
+	screen[head.y][head.x] = SNAKE_HEAD;	
 	head_pos = (head_pos + 1) % MAX_POS;
 	position[head_pos].y = head.y;
 	position[head_pos].x = head.x;
@@ -112,7 +111,7 @@ void print_screen()
 	clear();
 	for (int i = 0; i < Y; i++)
 		for (int j = 0; j < X; j++)
-			addch(SCREEN[i][j]);
+			addch(screen[i][j]);
 	refresh();
 }
 
@@ -135,32 +134,31 @@ void init_game()
 	score = 0;
 	direction = RIGHT;
 	
-	screen = malloc(sizeof(char[Y][X]));
-	memset(screen, SPACE, Y*X);
+	memset(screen, SPACE, sizeof(screen));
 
 	for (int i = 0; i < X; i++) {
-		SCREEN[0][i] = EDGE_ORIZONTAL;
-		SCREEN[Y-1][i] = EDGE_ORIZONTAL;		
+		screen[0][i] = EDGE_ORIZONTAL;
+		screen[Y-1][i] = EDGE_ORIZONTAL;		
 	}
 
 	for (int i = 0; i < Y; i++) {
-		SCREEN[i][0] = EDGE_VERTICAL;
-		SCREEN[i][X-1] = EDGE_VERTICAL;		
+		screen[i][0] = EDGE_VERTICAL;
+		screen[i][X-1] = EDGE_VERTICAL;		
 	}
 
-	SCREEN[0][0] = CORNER;
-	SCREEN[0][X-1] = CORNER;
-	SCREEN[Y-1][0] = CORNER;
-	SCREEN[Y-1][X-1] = CORNER;
+	screen[0][0] = CORNER;
+	screen[0][X-1] = CORNER;
+	screen[Y-1][0] = CORNER;
+	screen[Y-1][X-1] = CORNER;
 	
 	for (head_pos = 0; head_pos < 7; head_pos++) {
 		position[head_pos].x = X/2;
 		position[head_pos].y = Y/2;
-		SCREEN[position[head_pos].y][position[head_pos].x] = SNAKE_BODY;				
+		screen[position[head_pos].y][position[head_pos].x] = SNAKE_BODY;				
 		length++;
 	}
 	head_pos--;
-	SCREEN[position[head_pos].y][position[head_pos].x] = SNAKE_HEAD;		
+	screen[position[head_pos].y][position[head_pos].x] = SNAKE_HEAD;		
 	add_powerup();
 	add_powerup();
 	print_screen();	
@@ -224,7 +222,7 @@ void advance()
 		break;
 	}
 
-	switch (SCREEN[head.y][head.x]) {
+	switch (screen[head.y][head.x]) {
 	case SPACE:
 		add_head(head);
 		remove_tail();		
@@ -253,10 +251,10 @@ void advance()
 		add_head(head);
 		remove_tail();
 		for (int i = 0; i < 5; i++) {
-			SCREEN[head.y][head.x] = SUPER_POWERUP;		
+			screen[head.y][head.x] = SUPER_POWERUP;		
 			print_screen();			
 			usleep(140000);	
-			SCREEN[head.y][head.x] = SNAKE_HEAD;
+			screen[head.y][head.x] = SNAKE_HEAD;
 			print_screen();
 			usleep(140000);		
 		}
