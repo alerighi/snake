@@ -6,12 +6,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h> 
 #include <ncurses.h> 
 #include <unistd.h>
 #include <signal.h>
+#include <fcntl.h>
 
-#define VERSION "1.1.1"
+#define VERSION "1.2.0"
 #define VERSIONSTRING "Snake v" VERSION " (c) 2017 Alessandro Righi"
 #define UP 1
 #define DOWN 2
@@ -45,6 +45,24 @@ static unsigned int tail_pos;
 static const char *SCORE_FILENAME = ".snake_score";
 static struct point { int x, y; } position[MAX_POS];
 static int difficulty = MEDIUM;
+static int limit = 1;
+
+/* better random function */
+int rand() {
+	unsigned int res;
+	static int fd;
+	if (!fd) {
+		if ((fd = open("/dev/random", O_RDONLY)) == -1) {
+			perror("Error opening /dev/random");
+			exit(1);
+		}
+	}
+	if (read(fd, &res, sizeof(res)) != sizeof(res)) {
+		perror("Error reading from /dev/random");
+		exit(1);
+	}
+	return (int) (res % RAND_MAX);
+}
 
 void load_score() 
 {
@@ -74,8 +92,8 @@ void add_powerup()
 {
 	int x, y;
 	do {
-		x = rand() % COLS;
-		y = rand() % LINES;
+		x = rand() % X;
+		y = rand() % Y;
 	} while (screen[y][x] != SPACE);
 
 	switch (rand() % 10) {
@@ -136,21 +154,23 @@ void init_game()
 	
 	memset(screen, SPACE, sizeof(screen));
 
-	for (int i = 0; i < X; i++) {
-		screen[0][i] = EDGE_ORIZONTAL;
-		screen[Y-1][i] = EDGE_ORIZONTAL;		
+	if (limit) {
+		for (int i = 0; i < X; i++) {
+			screen[0][i] = EDGE_ORIZONTAL;
+			screen[Y-1][i] = EDGE_ORIZONTAL;		
+		}
+
+		for (int i = 0; i < Y; i++) {
+			screen[i][0] = EDGE_VERTICAL;
+			screen[i][X-1] = EDGE_VERTICAL;		
+		}
+
+		screen[0][0] = CORNER;
+		screen[0][X-1] = CORNER;
+		screen[Y-1][0] = CORNER;
+		screen[Y-1][X-1] = CORNER;
 	}
 
-	for (int i = 0; i < Y; i++) {
-		screen[i][0] = EDGE_VERTICAL;
-		screen[i][X-1] = EDGE_VERTICAL;		
-	}
-
-	screen[0][0] = CORNER;
-	screen[0][X-1] = CORNER;
-	screen[Y-1][0] = CORNER;
-	screen[Y-1][X-1] = CORNER;
-	
 	for (head_pos = 0; head_pos < 7; head_pos++) {
 		position[head_pos].x = X/2;
 		position[head_pos].y = Y/2;
@@ -210,15 +230,23 @@ void advance()
 	switch (direction) {
 	case UP: 
 		head.y -= 1;
+		if (head.y < 0)
+			head.y = Y - 1;
 		break;
 	case DOWN: 
 		head.y += 1;
+		if (head.y == Y)
+			head.y = 0;
 		break;
 	case LEFT: 
 		head.x -= 1;
+		if (head.x < 0)
+			head.x = X - 1;
 		break;
 	case RIGHT:
 		head.x += 1;
+		if (head.x == X)
+			head.x = 0;
 		break;
 	}
 
@@ -239,6 +267,7 @@ void advance()
 	case BOMB:
 		add_head(head);
 		remove_tail();
+		score -= 35;
 		for (int i = 0; i < 25; i++) {
 			remove_tail();
 			if (--length == 0)
@@ -271,6 +300,7 @@ void _Noreturn usage()
 		   "    -d {easy/medium/hard} select difficulty\n"
 		   "    -h                    show this help\n"
 		   "    -v                    version string\n"
+		   "    -n                    no screen border\n"
 		   " * move the snake with arrow keys or wasd\n"
 		   " * space bar for extra speed (use with caution)\n"
 		   " * q for quitting the game\n"
@@ -287,13 +317,16 @@ void _Noreturn usage()
 int main(int argc, char *argv[]) 
 {
 	char c;
-	while ((c = getopt(argc, argv, "hvd:")) != -1) {
+	while ((c = getopt(argc, argv, "hvnd:")) != -1) {
 		switch (c) {
 		case 'h': 
 			usage();
 		case 'v': 
 			puts(VERSIONSTRING);
 			exit(EXIT_SUCCESS);
+		case 'n':
+			limit = 0;
+			break;
 		case 'd': 
 			if (!strcmp(optarg, "easy"))
 				difficulty = EASY;
@@ -314,7 +347,6 @@ int main(int argc, char *argv[])
 	keypad(stdscr, TRUE);
 	noecho();
 	curs_set(0);
-	srand(time(NULL));
 	signal(SIGALRM, advance);
 	load_score();
 	init_game();
@@ -322,18 +354,22 @@ int main(int argc, char *argv[])
 	while (true) {
 		switch (getch()) {
 		case KEY_UP: 
+		case 'k':
 			if (direction != DOWN || !score)
 				direction = UP;
 			break;
 		case KEY_DOWN:
+		case 'j':
 			if (direction != UP || !score)
 				direction = DOWN;
 			break;
 		case KEY_LEFT:
+		case 'h':
 			if (direction != RIGHT || !score)
 				direction = LEFT;
 			break;
 		case KEY_RIGHT:
+		case 'l':
 			if (direction != LEFT || !score)
 				direction = RIGHT;
 			break;
