@@ -51,6 +51,7 @@ static int limit = 1;
 int rand() {
 	unsigned int res;
 	static int fd;
+
 	if (!fd) {
 		if ((fd = open("/dev/random", O_RDONLY)) == -1) {
 			perror("Error opening /dev/random");
@@ -91,6 +92,7 @@ void save_score()
 void add_powerup() 
 {
 	int x, y;
+
 	do {
 		x = rand() % X;
 		y = rand() % Y;
@@ -126,16 +128,24 @@ void add_head(struct point head)
 
 void print_screen() 
 {
+	int i, j;
+	
 	clear();
-	for (int i = 0; i < Y; i++)
-		for (int j = 0; j < X; j++)
+
+	for (i = 0; i < Y; i++)
+		for (j = 0; j < X; j++)
 			addch(screen[i][j]);
+
+	if (limit)
+		mvprintw(0, 4, " SCORE %d; HIGH SCORE %d ", score, high_score);
+	
 	refresh();
 }
 
 void dup_tail() 
 {
 	struct point tail = position[tail_pos];
+
 	tail_pos = (tail_pos - 1) % MAX_POS;
 	position[tail_pos] = tail;
 	length++;
@@ -144,6 +154,8 @@ void dup_tail()
 
 void init_game() 
 {
+	int i;
+	
 	Y = LINES;
 	X = COLS;
 	length = 0;
@@ -155,12 +167,12 @@ void init_game()
 	memset(screen, SPACE, sizeof(screen));
 
 	if (limit) {
-		for (int i = 0; i < X; i++) {
+		for (i = 0; i < X; i++) {
 			screen[0][i] = EDGE_ORIZONTAL;
 			screen[Y-1][i] = EDGE_ORIZONTAL;		
 		}
 
-		for (int i = 0; i < Y; i++) {
+		for (i = 0; i < Y; i++) {
 			screen[i][0] = EDGE_VERTICAL;
 			screen[i][X-1] = EDGE_VERTICAL;		
 		}
@@ -188,12 +200,17 @@ void _Noreturn quit_game()
 {
 	endwin();
 	printf("Game ended\n");
-	printf("You scored %d - high score is %d\n", score, high_score);
+	if (score == high_score)
+		printf("Congratulations! You beated the high score with %d", score);
+	else
+		printf("You scored %d - high score is %d\n", score, high_score);
 	exit(EXIT_SUCCESS);
 }
 
 void game_lost() 
 {
+	char c;
+	
 	PRINT_CENTER(-1, "You lose!");
 	if (score > high_score) {
 		high_score = score;
@@ -204,7 +221,7 @@ void game_lost()
 	}
 	PRINT_CENTER(1, "Play new game ? (y/n)");
 	refresh();
-	char c; 
+ 
 	while ((c = getch())) {
 		switch (c) {
 		case 'y':
@@ -218,14 +235,16 @@ void game_lost()
 
 void advance()
 {
+	int i;
+	struct point head = position[head_pos];
+
 	if (!score)
 		score = 1;
+	
 	if (direction == LEFT || direction == RIGHT)
 		ualarm(difficulty-level*3000,0);	
 	else
 		ualarm(difficulty*2-level*6000,0);	
-
-	struct point head = position[head_pos];
 
 	switch (direction) {
 	case UP: 
@@ -256,7 +275,7 @@ void advance()
 		remove_tail();		
 		break;		
 	case SUPER_POWERUP:
-		for (int i = 0; i < 15; i++)
+		for (i = 0; i < 15; i++)
 			dup_tail();
 	case POWERUP:
 		add_head(head);
@@ -268,7 +287,7 @@ void advance()
 		add_head(head);
 		remove_tail();
 		score -= 35;
-		for (int i = 0; i < 25; i++) {
+		for (i = 0; i < 25; i++) {
 			remove_tail();
 			if (--length == 0)
 				break;
@@ -279,7 +298,7 @@ void advance()
 		alarm(0);
 		add_head(head);
 		remove_tail();
-		for (int i = 0; i < 5; i++) {
+		for (i = 0; i < 5; i++) {
 			screen[head.y][head.x] = SUPER_POWERUP;		
 			print_screen();			
 			usleep(140000);	
@@ -314,9 +333,33 @@ void _Noreturn usage()
 	exit(EXIT_SUCCESS);
 }
 
+void confirm_exit()
+{
+	char c;
+
+	alarm(0);
+	PRINT_CENTER(0, "Are you sure you want to quit ? (y/n)");
+	refresh();
+	while ((c = getch())) {
+		switch (c) {
+		case 'y':
+			if (score > high_score) {
+				high_score = score;
+				save_score();
+			}
+			quit_game();
+		case 'n':
+			advance();
+			return;
+		}
+	}
+}
+
 int main(int argc, char *argv[]) 
 {
 	char c;
+	int i;
+
 	while ((c = getopt(argc, argv, "hvnd:")) != -1) {
 		switch (c) {
 		case 'h': 
@@ -341,13 +384,14 @@ int main(int argc, char *argv[])
 			usage();
 		}
 	}
-
+	
 	initscr();
 	cbreak();
 	keypad(stdscr, TRUE);
 	noecho();
 	curs_set(0);
 	signal(SIGALRM, advance);
+	signal(SIGINT, confirm_exit);
 	load_score();
 	init_game();
 
@@ -374,7 +418,7 @@ int main(int argc, char *argv[])
 				direction = RIGHT;
 			break;
 		case SPACE: 
-			for (int i = 0; i < 5; i++) {
+			for (i = 0; i < 5; i++) {
 				advance();
 				usleep(10000);
 			}
@@ -386,7 +430,7 @@ int main(int argc, char *argv[])
 				/* wait */;
 			break;
 		case 'q': 
-			quit_game();
+			confirm_exit();
 		}
 		advance();
 	}
