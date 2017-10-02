@@ -34,7 +34,7 @@
 
 static int direction;
 static int length;
-static char screen[128][256];
+static char screen[256][512];
 static int Y;
 static int X;
 static int level;
