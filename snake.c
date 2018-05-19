@@ -228,7 +228,6 @@ static void game_lost(void)
 	
 	if (score > high_score) {
 		high_score = score;
-		save_score();
 		print_center(0, "Congratulations! New High Score %d!", score);
 	} else {
 		print_center(0, "Your score: %d", score);
