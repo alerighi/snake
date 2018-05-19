@@ -20,9 +20,6 @@ enum {
 	SUPER_POWERUP = '%',
 	BOMB = '*',
 	SPACE = ' ', 
-	CORNER = '+', 
-	EDGE_VERTICAL = '|',
-	EDGE_ORIZONTAL = '-',
 };
 
 enum direction {
