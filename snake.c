@@ -1,6 +1,6 @@
 /* 
  * Snake game
- * Copyright (c) 2017 Alessandro Righi - MIT license
+ * Copyright (c) 2017-2018 Alessandro Righi - MIT license
  */
 
 #include <stdio.h>
@@ -9,93 +9,108 @@
 #include <ncurses.h> 
 #include <unistd.h>
 #include <signal.h>
-#include <fcntl.h>
+#include <stdarg.h>
+#include <stdbool.h>
+#include <time.h>
 
-#define VERSION "1.2.0"
-#define VERSIONSTRING "Snake v" VERSION " (c) 2017 Alessandro Righi"
-#define UP 1
-#define DOWN 2
-#define LEFT 3
-#define RIGHT 4
-#define SNAKE_HEAD '@'
-#define SNAKE_BODY '#'
-#define POWERUP '$'
-#define SUPER_POWERUP '%'
-#define BOMB '*'
-#define SPACE ' '
-#define CORNER '+'
-#define EDGE_VERTICAL '|'
-#define EDGE_ORIZONTAL '-'
-#define MAX_POS 1024
-#define PRINT_CENTER(i, message, ...) mvprintw(Y/2+i, X/2 - strlen(message)/2, message, ##__VA_ARGS__)
-#define EASY 90000
-#define MEDIUM 60000
-#define HARD 30000
+enum {
+	SNAKE_HEAD = '@',
+	SNAKE_BODY = '#',
+	POWERUP = '$',
+	SUPER_POWERUP = '%',
+	BOMB = '*',
+	SPACE = ' ', 
+	CORNER = '+', 
+	EDGE_VERTICAL = '|',
+	EDGE_ORIZONTAL = '-',
+};
 
-static int direction;
+enum direction {
+	UP,
+	DOWN,
+	LEFT,
+	RIGHT,
+};
+
+enum difficulty {
+	EASY = 90,
+	MEDIUM = 60,
+	HARD = 30,
+};
+
+enum limits {
+	MAX_SIZE_X = 512,  /* max fiedl size X */
+	MAX_SIZE_Y = 256,  /* max field size Y */
+	MAX_LENGTH = 4096, /* max snake length */ 
+};
+
+struct point { 
+	int x, y; 
+};
+
+static const char* VERSION = "1.3.0";
+static const char* VERSIONSTRING = "Snake v1.2.1 (c) 2017 Alessandro Righi";
+
+static char score_filename[1024];
+static chtype screen[MAX_SIZE_Y][MAX_SIZE_X];
+
+static enum direction direction;
+static enum difficulty difficulty = MEDIUM;
+
+static struct point position[MAX_LENGTH];
+static struct point size;
+
+static bool limit = true;
+
 static int length;
-static char screen[256][512];
-static int Y;
-static int X;
 static int level;
 static int score;
 static int high_score;
-static unsigned int head_pos;
-static unsigned int tail_pos;
-static const char *SCORE_FILENAME = ".snake_score";
-static struct point { int x, y; } position[MAX_POS];
-static int difficulty = MEDIUM;
-static int limit = 1;
+static int head_pos;
+static int tail_pos;
 
-/* better random function */
-int rand() {
-	unsigned int res;
-	static int fd;
-
-	if (!fd) {
-		if ((fd = open("/dev/random", O_RDONLY)) == -1) {
-			perror("Error opening /dev/random");
-			exit(1);
-		}
-	}
-	if (read(fd, &res, sizeof(res)) != sizeof(res)) {
-		perror("Error reading from /dev/random");
-		exit(1);
-	}
-	return (int) (res % RAND_MAX);
+static void print_center(int i, const char *fmt, ...) 
+{
+	va_list args; 
+	va_start(args, fmt);
+	move(size.y / 2 + i, size.x / 2 - (int) strlen(fmt) / 2);
+	vwprintw(stdscr, fmt, args);
+	va_end(args);
 }
 
-void load_score() 
+static void load_score(void) 
 {
-	char filename[1024];
 	FILE *score_fp;
+
+	snprintf(score_filename, sizeof score_filename, "%s/.snake_score", getenv("HOME"));
 	
-	sprintf(filename, "%s/%s", getenv("HOME"), SCORE_FILENAME);
-	if ((score_fp = fopen(filename, "r"))) {
-		fscanf(score_fp, "%d", &high_score);
+	if ((score_fp = fopen(score_filename, "r"))) {
+		fscanf(score_fp, "%ud", &high_score);
 		fclose(score_fp);
-	} 
+	} else {
+		perror("Error loading score");
+	}
 }
 
-void save_score() 
+static void save_score(void) 
 {
-	char filename[1024];
 	FILE *score_fp;
 
-	sprintf(filename, "%s/%s", getenv("HOME"), SCORE_FILENAME);
-	if ((score_fp = fopen(filename, "w+"))) {
-		fprintf(score_fp, "%d\n", high_score);
+	if ((score_fp = fopen(score_filename, "w+"))) {
+		fprintf(score_fp, "%ud\n", high_score);
 		fclose(score_fp);
-	} 
+	} else {
+		perror("Error saving score");
+	}
 }
 
-void add_powerup() 
+static void add_powerup(void) 
 {
 	int x, y;
 
 	do {
-		x = rand() % X;
-		y = rand() % Y;
+		x = rand() % size.x;
+		y = rand() % size.y;
 	} while (screen[y][x] != SPACE);
 
 	switch (rand() % 10) {
@@ -111,84 +126,87 @@ void add_powerup()
 	}
 }
 
-void remove_tail() 
+static void remove_tail(void) 
 {
 	screen[position[tail_pos].y][position[tail_pos].x] = SPACE;
-	tail_pos = (tail_pos + 1) % MAX_POS;
+	tail_pos = (tail_pos + 1) % MAX_LENGTH;
 }
 
-void add_head(struct point head) 
+static void add_head(struct point head) 
 {
 	screen[position[head_pos].y][position[head_pos].x] = SNAKE_BODY;
 	screen[head.y][head.x] = SNAKE_HEAD;	
-	head_pos = (head_pos + 1) % MAX_POS;
+	head_pos = (head_pos + 1) % MAX_LENGTH;
 	position[head_pos].y = head.y;
 	position[head_pos].x = head.x;
 }
 
-void print_screen() 
-{
-	int i, j;
-	
+static void print_screen(void) 
+{	
 	clear();
 
-	for (i = 0; i < Y; i++)
-		for (j = 0; j < X; j++)
+	for (int i = 0; i < size.y; i++) {
+		for (int j = 0; j < size.x; j++) {
 			addch(screen[i][j]);
+		}
+	}
 
 	if (limit)
-		mvprintw(0, 4, " SCORE %d; HIGH SCORE %d ", score, high_score);
+		mvprintw(0, 4, " SCORE %d; HIGH SCORE %u ", score, high_score);
 	
 	refresh();
 }
 
-void dup_tail() 
+static void dup_tail(void) 
 {
 	struct point tail = position[tail_pos];
 
-	tail_pos = (tail_pos - 1) % MAX_POS;
+	tail_pos = (tail_pos - 1) % MAX_LENGTH;
 	position[tail_pos] = tail;
 	length++;
 	score++;
 }
 
-void init_game() 
-{
-	int i;
-	
-	Y = LINES;
-	X = COLS;
+static void init_game(void) 
+{	
+	size.y = LINES;
+	size.x = COLS;
 	length = 0;
 	head_pos = 0;
 	tail_pos = 0;
 	score = 0;
 	direction = RIGHT;
 	
-	memset(screen, SPACE, sizeof(screen));
+	for (int y = 0; y < size.y; y++) {
+		for (int x = 0; x < size.x; x++) {
+			screen[y][x] = SPACE;
+		}
+	}
 
 	if (limit) {
-		for (i = 0; i < X; i++) {
-			screen[0][i] = EDGE_ORIZONTAL;
-			screen[Y-1][i] = EDGE_ORIZONTAL;		
+		for (int i = 0; i < size.x; i++) {
+			screen[0][i] = ACS_HLINE;
+			screen[size.y - 1][i] = ACS_HLINE;		
 		}
 
-		for (i = 0; i < Y; i++) {
-			screen[i][0] = EDGE_VERTICAL;
-			screen[i][X-1] = EDGE_VERTICAL;		
+		for (int i = 0; i < size.y; i++) {
+			screen[i][0] = ACS_VLINE;
+			screen[i][size.x - 1] = ACS_VLINE;		
 		}
 
-		screen[0][0] = CORNER;
-		screen[0][X-1] = CORNER;
-		screen[Y-1][0] = CORNER;
-		screen[Y-1][X-1] = CORNER;
+		screen[0][0] = ACS_ULCORNER;
+		screen[0][size.x - 1] = ACS_URCORNER;
+		screen[size.y - 1][0] = ACS_LLCORNER;
+		screen[size.y - 1][size.x - 1] = ACS_LRCORNER;
 	}
 
 	for (head_pos = 0; head_pos < 7; head_pos++) {
-		position[head_pos].x = X/2;
-		position[head_pos].y = Y/2;
+		position[head_pos].x = size.x / 2;
+		position[head_pos].y = size.y / 2;
 		screen[position[head_pos].y][position[head_pos].x] = SNAKE_BODY;				
 		length++;
 	}
+
 	head_pos--;
 	screen[position[head_pos].y][position[head_pos].x] = SNAKE_HEAD;		
 	add_powerup();
@@ -196,75 +214,72 @@ void init_game()
 	print_screen();	
 }
 
-void _Noreturn quit_game() 
+static void quit_game(void) 
 {
 	endwin();
-	printf("Game ended\n");
-	if (score == high_score)
-		printf("Congratulations! You beated the high score with %d", score);
-	else
-		printf("You scored %d - high score is %d\n", score, high_score);
-	exit(EXIT_SUCCESS);
+	if (score > high_score) {
+		printf("Congratulations! You beated the high score %d with %d\n", high_score, score);
+		high_score = score;
+	} 
+	save_score();
 }
 
-void game_lost() 
-{
-	char c;
+static void game_lost(void) 
+{	
+	int ch;
+
+	print_center(-1, "You lose!");
 	
-	PRINT_CENTER(-1, "You lose!");
 	if (score > high_score) {
 		high_score = score;
 		save_score();
-		PRINT_CENTER(0, "Congratulations! New High Score %d!", score);
+		print_center(0, "Congratulations! New High Score %d!", score);
 	} else {
-		PRINT_CENTER(0, "Your score: %d", score);
+		print_center(0, "Your score: %d", score);
 	}
-	PRINT_CENTER(1, "Play new game ? (y/n)");
+
+	print_center(1, "Play new game ? (y/n)");
 	refresh();
  
-	while ((c = getch())) {
-		switch (c) {
-		case 'y':
-			init_game();
-			return;
-		case 'n': 
-			quit_game();
-		}
+	while ((ch = getch()) != 'y') {
+		if (ch == 'n')
+			exit(EXIT_SUCCESS);
 	}
+
+	init_game();
 }
 
-void advance()
+static void advance(void)
 {
-	int i;
 	struct point head = position[head_pos];
 
 	if (!score)
 		score = 1;
 	
 	if (direction == LEFT || direction == RIGHT)
-		ualarm(difficulty-level*3000,0);	
+		timeout(difficulty - (unsigned) level * 3);	
 	else
-		ualarm(difficulty*2-level*6000,0);	
+		timeout(difficulty * 2 - (unsigned) level * 6);	
 
 	switch (direction) {
 	case UP: 
 		head.y -= 1;
 		if (head.y < 0)
-			head.y = Y - 1;
+			head.y = size.y - 1;
 		break;
 	case DOWN: 
 		head.y += 1;
-		if (head.y == Y)
+		if (head.y == size.y)
 			head.y = 0;
 		break;
 	case LEFT: 
 		head.x -= 1;
 		if (head.x < 0)
-			head.x = X - 1;
+			head.x = size.x - 1;
 		break;
 	case RIGHT:
 		head.x += 1;
-		if (head.x == X)
+		if (head.x == size.x)
 			head.x = 0;
 		break;
 	}
@@ -275,8 +290,9 @@ void advance()
 		remove_tail();		
 		break;		
 	case SUPER_POWERUP:
-		for (i = 0; i < 15; i++)
+		for (int i = 0; i < 15; i++)
 			dup_tail();
+		/* fall-thru */
 	case POWERUP:
 		add_head(head);
 		add_powerup();
@@ -287,18 +303,18 @@ void advance()
 		add_head(head);
 		remove_tail();
 		score -= 35;
-		for (i = 0; i < 25; i++) {
+		for (int i = 0; i < 25; i++) {
 			remove_tail();
 			if (--length == 0)
 				break;
 		}
 		if (length)
 			break;
+		/* fall-thru */
 	default: 
-		alarm(0);
 		add_head(head);
 		remove_tail();
-		for (i = 0; i < 5; i++) {
+		for (int i = 0; i < 5; i++) {
 			screen[head.y][head.x] = SUPER_POWERUP;		
 			print_screen();			
 			usleep(140000);	
@@ -312,15 +328,15 @@ void advance()
 	level = score / 30;
 }
 
-void _Noreturn usage()
+static void usage(void)
 {
-	printf("Snake version " VERSION "\n"
+	printf("Snake version %s\n"
 		   "Usage: snake [-hvd]\n"
-		   "    -d {easy/medium/hard} select difficulty\n"
-		   "    -h                    show this help\n"
-		   "    -v                    version string\n"
-		   "    -n                    no screen border\n"
-		   " * move the snake with arrow keys or wasd\n"
+		   "    -d (e)asy/(m)edium/(h)ard select difficulty\n"
+		   "    -h                        show this help\n"
+		   "    -v                        version string\n"
+		   "    -n                        no screen border\n"
+		   " * move the snake with arrow keys\n"
 		   " * space bar for extra speed (use with caution)\n"
 		   " * q for quitting the game\n"
 		   " * p pause the game\n"
@@ -328,104 +344,84 @@ void _Noreturn usage()
 		   " * powerups:\n"
 		   "     $ - increase snake length by 1\n"
 		   "     %% - increase snake length by 15\n"
-		   "     * - decrease snake length by 25\n"
+		   "     * - decrease snake length by 25\n", VERSION
 		);
-	exit(EXIT_SUCCESS);
 }
 
-void confirm_exit()
+static void confirm_exit(void)
 {
-	char c;
+	int ch;
 
-	alarm(0);
-	PRINT_CENTER(0, "Are you sure you want to quit ? (y/n)");
+	print_center(0, "Are you sure you want to quit ? (y/n)");
 	refresh();
-	while ((c = getch())) {
-		switch (c) {
-		case 'y':
-			if (score > high_score) {
-				high_score = score;
-				save_score();
-			}
-			quit_game();
-		case 'n':
-			advance();
-			return;
-		}
+	timeout(0);
+	while ((ch = getch()) != 'n') {
+		if (ch == 'y')
+			exit(EXIT_SUCCESS);
 	}
+	advance();
 }
 
-int main(int argc, char *argv[]) 
+static void parse_cmdline(int argc, char* argv[])
 {
-	char c;
-	int i;
+	int ch;
 
-	while ((c = getopt(argc, argv, "hvnd:")) != -1) {
-		switch (c) {
+	while ((ch = getopt(argc, argv, "hvnd:")) != -1) {
+		switch (ch) {
 		case 'h': 
 			usage();
+			exit(EXIT_SUCCESS);
 		case 'v': 
 			puts(VERSIONSTRING);
 			exit(EXIT_SUCCESS);
 		case 'n':
-			limit = 0;
+			limit = false;
 			break;
 		case 'd': 
-			if (!strcmp(optarg, "easy"))
-				difficulty = EASY;
-			else if (!strcmp(optarg, "medium"))
-				difficulty = MEDIUM;
-			else if (!strcmp(optarg, "hard"))
-				difficulty = HARD;
-			else 
-				usage();
+			switch (optarg[0]) {
+			case 'e': difficulty = EASY; break;
+			case 'm': difficulty = MEDIUM; break;
+			case 'h': difficulty = HARD; break;
+			default: 
+				puts("Invalid difficulty, allowed values: (e)asy, (m)edium, (h)ard"); 
+				exit(EXIT_FAILURE);
+			}
 			break;
 		default:
 			usage();
+			exit(EXIT_FAILURE);
 		}
 	}
-	
-	initscr();
-	cbreak();
-	keypad(stdscr, TRUE);
-	noecho();
-	curs_set(0);
-	signal(SIGALRM, advance);
-	signal(SIGINT, confirm_exit);
-	load_score();
-	init_game();
+}
 
+_Noreturn static void main_loop(void) 
+{
 	while (true) {
 		switch (getch()) {
 		case KEY_UP: 
-		case 'k':
 			if (direction != DOWN || !score)
 				direction = UP;
 			break;
 		case KEY_DOWN:
-		case 'j':
 			if (direction != UP || !score)
 				direction = DOWN;
 			break;
 		case KEY_LEFT:
-		case 'h':
 			if (direction != RIGHT || !score)
 				direction = LEFT;
 			break;
 		case KEY_RIGHT:
-		case 'l':
 			if (direction != LEFT || !score)
 				direction = RIGHT;
 			break;
 		case SPACE: 
-			for (i = 0; i < 5; i++) {
+			for (int i = 0; i < 5; i++) {
 				advance();
 				usleep(10000);
 			}
 			break;
 		case 'p': 
-			PRINT_CENTER(0, "Game paused - press 'p' to resume");
-			alarm(0);
+			print_center(0, "Game paused - press 'p' to resume");
 			while (getch() != 'p')
 				/* wait */;
 			break;
@@ -434,5 +430,24 @@ int main(int argc, char *argv[])
 		}
 		advance();
 	}
-	return 0;
+}
+
+static void init_curses(void)
+{
+	initscr();
+	cbreak();
+	keypad(stdscr, true);
+	noecho();
+	curs_set(false);
+}
+
+int main(int argc, char *argv[]) 
+{
+	srand((unsigned) time(NULL));
+	load_score();
+	parse_cmdline(argc, argv);
+	init_curses();	
+	init_game();
+	atexit(quit_game);
+	main_loop();	
 }
