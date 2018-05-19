@@ -8,7 +8,6 @@
 #include <string.h>
 #include <ncurses.h> 
 #include <unistd.h>
-#include <signal.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <time.h>
