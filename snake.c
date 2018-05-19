@@ -36,9 +36,9 @@ enum difficulty {
 };
 
 enum limits {
-	MAX_SIZE_X = 512,  /* max field size X */
-	MAX_SIZE_Y = 256,  /* max field size Y */
-	MAX_LENGTH = 4096, /* max snake length */ 
+	MAX_SIZE_X = 512,
+	MAX_SIZE_Y = 256,
+	MAX_SNAKE_LENGTH = 4096,
 };
 
 struct point { 
@@ -54,7 +54,7 @@ static chtype screen[MAX_SIZE_Y][MAX_SIZE_X];
 static enum direction direction;
 static enum difficulty difficulty = MEDIUM;
 
-static struct point position[MAX_LENGTH];
+static struct point position[MAX_SNAKE_LENGTH];
 static struct point size;
 
 static bool limit = true;
@@ -126,14 +126,14 @@ static void add_powerup(void)
 static void remove_tail(void) 
 {
 	screen[position[tail_pos].y][position[tail_pos].x] = SPACE;
-	tail_pos = (tail_pos + 1) % MAX_LENGTH;
+	tail_pos = (tail_pos + 1) % MAX_SNAKE_LENGTH;
 }
 
 static void add_head(struct point head) 
 {
 	screen[position[head_pos].y][position[head_pos].x] = SNAKE_BODY;
 	screen[head.y][head.x] = SNAKE_HEAD;	
-	head_pos = (head_pos + 1) % MAX_LENGTH;
+	head_pos = (head_pos + 1) % MAX_SNAKE_LENGTH;
 	position[head_pos].y = head.y;
 	position[head_pos].x = head.x;
 }
@@ -158,7 +158,7 @@ static void dup_tail(void)
 {
 	struct point tail = position[tail_pos];
 
-	tail_pos = (tail_pos - 1) % MAX_LENGTH;
+	tail_pos = (tail_pos - 1) % MAX_SNAKE_LENGTH;
 	position[tail_pos] = tail;
 	length++;
 	score++;
