@@ -6,10 +6,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ncurses.h> 
-#include <unistd.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#include <ncurses.h> 
+#include <getopt.h>
 #include <time.h>
 
 enum {
@@ -46,6 +46,21 @@ struct point {
 
 static const char* VERSION = "1.3.0";
 static const char* VERSIONSTRING = "Snake v1.2.1 (c) 2017 Alessandro Righi";
+static const char* USAGE = 
+		"Usage: snake [-hvd]\n"
+		"    -d (e)asy/(m)edium/(h)ard select difficulty\n"
+		"    -h                        show this help\n"
+		"    -v                        version string\n"
+		"    -n                        no screen border\n"
+		" * move the snake with arrow keys\n"
+		" * space bar for extra speed (use with caution)\n"
+		" * q for quitting the game\n"
+		" * p pause the game\n"
+		" * if you hit the borders of the screen, or your tail, you lose\n"		   
+		" * powerups:\n"
+		"     $ - increase snake length by 1\n"
+		"     %% - increase snake length by 15\n"
+		"     * - decrease snake length by 25"; 
 
 static char score_filename[1024];
 static chtype screen[MAX_SIZE_Y][MAX_SIZE_X];
@@ -323,26 +338,6 @@ static void advance(void)
 	level = score / 30;
 }
 
-static void usage(void)
-{
-	printf("Snake version %s\n"
-		   "Usage: snake [-hvd]\n"
-		   "    -d (e)asy/(m)edium/(h)ard select difficulty\n"
-		   "    -h                        show this help\n"
-		   "    -v                        version string\n"
-		   "    -n                        no screen border\n"
-		   " * move the snake with arrow keys\n"
-		   " * space bar for extra speed (use with caution)\n"
-		   " * q for quitting the game\n"
-		   " * p pause the game\n"
-		   " * if you hit the borders of the screen, or your tail, you lose\n"		   
-		   " * powerups:\n"
-		   "     $ - increase snake length by 1\n"
-		   "     %% - increase snake length by 15\n"
-		   "     * - decrease snake length by 25\n", VERSION
-		);
-}
-
 static void confirm_exit(void)
 {
 	int ch;
@@ -364,7 +359,7 @@ static void parse_cmdline(int argc, char* argv[])
 	while ((ch = getopt(argc, argv, "hvnd:")) != -1) {
 		switch (ch) {
 		case 'h': 
-			usage();
+			puts(USAGE);
 			exit(EXIT_SUCCESS);
 		case 'v': 
 			puts(VERSIONSTRING);
@@ -383,7 +378,7 @@ static void parse_cmdline(int argc, char* argv[])
 			}
 			break;
 		default:
-			usage();
+			puts(USAGE);
 			exit(EXIT_FAILURE);
 		}
 	}
