@@ -36,7 +36,7 @@ enum difficulty {
 };
 
 enum limits {
-	MAX_SIZE_X = 512,  /* max fiedl size X */
+	MAX_SIZE_X = 512,  /* max field size X */
 	MAX_SIZE_Y = 256,  /* max field size Y */
 	MAX_LENGTH = 4096, /* max snake length */ 
 };
