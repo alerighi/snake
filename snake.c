@@ -34,7 +34,7 @@ enum difficulty {
 	HARD = 30,
 };
 
-enum limits {
+enum {
 	MAX_SIZE_X = 512,
 	MAX_SIZE_Y = 256,
 	MAX_SNAKE_LENGTH = 4096,
@@ -44,9 +44,8 @@ struct point {
 	int x, y; 
 };
 
-static const char* VERSION = "1.3.0";
-static const char* VERSIONSTRING = "Snake v1.2.1 (c) 2017 Alessandro Righi";
-static const char* USAGE = 
+static const char VERSIONSTRING[] = "Snake v1.2.1 (c) 2017 Alessandro Righi";
+static const char USAGE[] = 
 		"Usage: snake [-hvd]\n"
 		"    -d (e)asy/(m)edium/(h)ard select difficulty\n"
 		"    -h                        show this help\n"
