@@ -1,4 +1,4 @@
-CFLAGS:=-O3 -std=c11 -Wall -Wextra -lncurses -pedantic 
+CFLAGS:=-O3 -std=c11 -Wall -Wextra -pedantic -lncurses
 BINNAME:=snake
 SOURCE:=snake.c
 PREFIX:=/usr/local
