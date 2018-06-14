@@ -44,7 +44,7 @@ struct point {
 	int x, y; 
 };
 
-static const char VERSIONSTRING[] = "Snake v1.2.1 (c) 2017 Alessandro Righi";
+static const char VERSIONSTRING[] = "Snake v1.3.1 (c) 2017-2018 Alessandro Righi";
 static const char USAGE[] = 
 		"Usage: snake [-hvd]\n"
 		"    -d (e)asy/(m)edium/(h)ard select difficulty\n"
