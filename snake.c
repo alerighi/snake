@@ -8,7 +8,8 @@
 #include <string.h>
 #include <stdarg.h>
 #include <stdbool.h>
-#include <ncurses.h> 
+#include <ncurses.h>
+#include <unistd.h> 
 #include <getopt.h>
 #include <time.h>
 
@@ -95,7 +96,8 @@ static void load_score(void)
 	snprintf(score_filename, sizeof score_filename, "%s/.snake_score", getenv("HOME"));
 	
 	if ((score_fp = fopen(score_filename, "r"))) {
-		fscanf(score_fp, "%ud", &high_score);
+		if (fscanf(score_fp, "%d", &high_score) != 1)
+			high_score = 0;
 		fclose(score_fp);
 	} else {
 		perror("Error loading score");

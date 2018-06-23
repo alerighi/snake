@@ -1,4 +1,5 @@
-CFLAGS:=-O3 -std=c11 -Wall -Wextra -pedantic -lncurses
+CFLAGS:=-O3 -std=c11 -Wall -Wextra -pedantic -D_BSD_SOURCE
+LDFLAGS=-lncurses
 BINNAME:=snake
 SOURCE:=snake.c
 PREFIX:=/usr/local
@@ -6,7 +7,7 @@ PREFIX:=/usr/local
 .PHONY=clean install uninstall
 
 $(BINNAME): $(SOURCE)
-	$(CC) $(CFLAGS) -o $@ $<
+	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
 clean:
 	rm -f $(BINNAME)
