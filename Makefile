@@ -1,19 +1,27 @@
-CFLAGS:=-O3 -std=c11 -Wall -Wextra -pedantic -D_BSD_SOURCE
-LDFLAGS=-lncurses
+# snake - simple console snake game
+# Copyright (C) 2017-2020 Alessandro Righi
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+CFLAGS:=-O2 -std=c99 -Wall -Wextra -Werror=vla -pedantic -lncurses
 BINNAME:=snake
 SOURCE:=snake.c
-PREFIX:=/usr/local
-
-.PHONY=clean install uninstall
 
 $(BINNAME): $(SOURCE)
-	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
+	$(CC) $(CFLAGS) -o $@ $<
 
 clean:
 	rm -f $(BINNAME)
 
-install: $(BINNAME)
-	install -s $(BINNAME) -m 0755 $(PREFIX)/bin/
-
-uninstall:
-	rm -f $(PREFIX)/bin/$(BINNAME)
+.PHONY=clean

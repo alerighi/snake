@@ -1,39 +1,45 @@
-/* 
- * Snake game
- * Copyright (c) 2017-2018 Alessandro Righi - MIT license
+/*
+ * snake - simple console snake game
+ * Copyright (C) 2017-2020 Alessandro Righi
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <stdio.h>
+#define _DEFAULT_SOURCE
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
-#include <stdbool.h>
 #include <ncurses.h>
-#include <unistd.h> 
+#include <unistd.h>
 #include <getopt.h>
 #include <time.h>
 
-enum {
-	SNAKE_HEAD = '@',
-	SNAKE_BODY = '#',
-	POWERUP = '$',
-	SUPER_POWERUP = '%',
-	BOMB = '*',
-	SPACE = ' ', 
+enum color_pairs {
+	COLOR_HEAD = 1,
+	COLOR_BODY,
+	COLOR_POWERUP,
+	COLOR_SUPER_POWERUP,
+	COLOR_BOMB,
 };
 
-enum direction {
+enum {
 	UP,
 	DOWN,
 	LEFT,
 	RIGHT,
-};
-
-enum difficulty {
-	EASY = 90,
-	MEDIUM = 60,
-	HARD = 30,
-};
+} direction;
 
 enum {
 	MAX_SIZE_X = 512,
@@ -41,82 +47,26 @@ enum {
 	MAX_SNAKE_LENGTH = 4096,
 };
 
-struct point { 
-	int x, y; 
-};
+struct point {
+	int x, y;
+} position[MAX_SNAKE_LENGTH], size;
 
-static const char VERSIONSTRING[] = "Snake v1.3.1 (c) 2017-2018 Alessandro Righi";
-static const char USAGE[] = 
-		"Usage: snake [-hvd]\n"
-		"    -d (e)asy/(m)edium/(h)ard select difficulty\n"
-		"    -h                        show this help\n"
-		"    -v                        version string\n"
-		"    -n                        no screen border\n"
-		" * move the snake with arrow keys\n"
-		" * space bar for extra speed (use with caution)\n"
-		" * q for quitting the game\n"
-		" * p pause the game\n"
-		" * if you hit the borders of the screen, or your tail, you lose\n"		   
-		" * powerups:\n"
-		"     $ - increase snake length by 1\n"
-		"     %% - increase snake length by 15\n"
-		"     * - decrease snake length by 25"; 
+int screen[MAX_SIZE_Y][MAX_SIZE_X], started, length, head_pos, tail_pos;
 
-static char score_filename[1024];
-static chtype screen[MAX_SIZE_Y][MAX_SIZE_X];
+#include "config.h"
 
-static enum direction direction;
-static enum difficulty difficulty = MEDIUM;
-
-static struct point position[MAX_SNAKE_LENGTH];
-static struct point size;
-
-static bool limit = true;
-
-static int length;
-static int level;
-static int score;
-static int high_score;
-static int head_pos;
-static int tail_pos;
-
-static void print_center(int i, const char *fmt, ...) 
+void
+print_center(int i, const char *fmt, ...)
 {
-	va_list args; 
+	va_list args;
 	va_start(args, fmt);
 	move(size.y / 2 + i, size.x / 2 - (int) strlen(fmt) / 2);
 	vwprintw(stdscr, fmt, args);
 	va_end(args);
 }
 
-static void load_score(void) 
-{
-	FILE *score_fp;
-
-	snprintf(score_filename, sizeof score_filename, "%s/.snake_score", getenv("HOME"));
-	
-	if ((score_fp = fopen(score_filename, "r"))) {
-		if (fscanf(score_fp, "%d", &high_score) != 1)
-			high_score = 0;
-		fclose(score_fp);
-	} else {
-		perror("Error loading score");
-	}
-}
-
-static void save_score(void) 
-{
-	FILE *score_fp;
-
-	if ((score_fp = fopen(score_filename, "w+"))) {
-		fprintf(score_fp, "%ud\n", high_score);
-		fclose(score_fp);
-	} else {
-		perror("Error saving score");
-	}
-}
-
-static void add_powerup(void) 
+void
+add_powerup(void)
 {
 	int x, y;
 
@@ -127,83 +77,99 @@ static void add_powerup(void)
 
 	switch (rand() % 10) {
 	case 7:
-		screen[y][x] = SUPER_POWERUP;	
+		screen[y][x] = SUPER_POWERUP;
 		break;
 	case 3:
 		screen[y][x] = BOMB;
 		add_powerup();
 		break;
-	default: 
+	default:
 		screen[y][x] = POWERUP;
 	}
 }
 
-static void remove_tail(void) 
+void
+remove_tail(void)
 {
 	screen[position[tail_pos].y][position[tail_pos].x] = SPACE;
 	tail_pos = (tail_pos + 1) % MAX_SNAKE_LENGTH;
 }
 
-static void add_head(struct point head) 
+void
+add_head(struct point head)
 {
 	screen[position[head_pos].y][position[head_pos].x] = SNAKE_BODY;
-	screen[head.y][head.x] = SNAKE_HEAD;	
+	screen[head.y][head.x] = SNAKE_HEAD;
 	head_pos = (head_pos + 1) % MAX_SNAKE_LENGTH;
 	position[head_pos].y = head.y;
 	position[head_pos].x = head.x;
 }
 
-static void print_screen(void) 
-{	
-	clear();
+void
+refresh_screen(void)
+{
+	int y, x, color;
 
-	for (int i = 0; i < size.y; i++) {
-		for (int j = 0; j < size.x; j++) {
-			addch(screen[i][j]);
+	for (y = 0; y < size.y; y++) {
+		for (x = 0; x < size.x; x++) {
+			switch (screen[y][x]) {
+			case SNAKE_HEAD: color = COLOR_HEAD; break;
+			case SNAKE_BODY: color = COLOR_BODY; break;
+			case POWERUP: color = COLOR_POWERUP; break;
+			case SUPER_POWERUP: color = COLOR_SUPER_POWERUP; break;
+			case BOMB: color = COLOR_BOMB; break;
+			default: color = 0;
+			}
+
+			attron(COLOR_PAIR(color));
+			mvaddch(y, x, screen[y][x]);
+			attroff(COLOR_PAIR(color));
 		}
 	}
 
 	if (limit)
-		mvprintw(0, 4, " SCORE %d; HIGH SCORE %u ", score, high_score);
-	
+		mvprintw(0, 4, " SCORE %d; LEVEL %d ", length, level());
 	refresh();
 }
 
-static void dup_tail(void) 
+void
+dup_tail(void)
 {
 	struct point tail = position[tail_pos];
 
 	tail_pos = (tail_pos - 1) % MAX_SNAKE_LENGTH;
 	position[tail_pos] = tail;
 	length++;
-	score++;
 }
 
-static void init_game(void) 
-{	
+void
+init_game(void)
+{
+	int y, x;
+
 	size.y = LINES;
 	size.x = COLS;
 	length = 0;
+	started = 0;
 	head_pos = 0;
 	tail_pos = 0;
-	score = 0;
 	direction = RIGHT;
-	
-	for (int y = 0; y < size.y; y++) {
-		for (int x = 0; x < size.x; x++) {
+
+	for (y = 0; y < size.y; y++) {
+		for (x = 0; x < size.x; x++) {
 			screen[y][x] = SPACE;
 		}
 	}
 
 	if (limit) {
-		for (int i = 0; i < size.x; i++) {
-			screen[0][i] = ACS_HLINE;
-			screen[size.y - 1][i] = ACS_HLINE;		
+		for (x = 0; x < size.x; x++) {
+			screen[0][x] = ACS_HLINE;
+			screen[size.y - 1][x] = ACS_HLINE;
 		}
 
-		for (int i = 0; i < size.y; i++) {
-			screen[i][0] = ACS_VLINE;
-			screen[i][size.x - 1] = ACS_VLINE;		
+		for (y = 0; y < size.y; y++) {
+			screen[y][0] = ACS_VLINE;
+			screen[y][size.x - 1] = ACS_VLINE;
 		}
 
 		screen[0][0] = ACS_ULCORNER;
@@ -212,46 +178,31 @@ static void init_game(void)
 		screen[size.y - 1][size.x - 1] = ACS_LRCORNER;
 	}
 
-	for (head_pos = 0; head_pos < 7; head_pos++) {
+	for (head_pos = 0; head_pos < initial_length; head_pos++) {
 		position[head_pos].x = size.x / 2;
 		position[head_pos].y = size.y / 2;
-		screen[position[head_pos].y][position[head_pos].x] = SNAKE_BODY;				
+		screen[position[head_pos].y][position[head_pos].x] = SNAKE_BODY;
 		length++;
 	}
 
 	head_pos--;
-	screen[position[head_pos].y][position[head_pos].x] = SNAKE_HEAD;		
+	screen[position[head_pos].y][position[head_pos].x] = SNAKE_HEAD;
 	add_powerup();
 	add_powerup();
-	print_screen();	
+	refresh_screen();
 }
 
-static void quit_game(void) 
+void
+game_lost(void)
 {
-	endwin();
-	if (score > high_score) {
-		printf("Congratulations! You beated the high score %d with %d\n", high_score, score);
-		high_score = score;
-	} 
-	save_score();
-}
-
-static void game_lost(void) 
-{	
 	int ch;
 
 	print_center(-1, "You lose!");
-	
-	if (score > high_score) {
-		high_score = score;
-		print_center(0, "Congratulations! New High Score %d!", score);
-	} else {
-		print_center(0, "Your score: %d", score);
-	}
-
+	print_center(0, "Your score: %d", length);
 	print_center(1, "Play new game ? (y/n)");
+
 	refresh();
- 
+
 	while ((ch = getch()) != 'y') {
 		if (ch == 'n')
 			exit(EXIT_SUCCESS);
@@ -260,30 +211,31 @@ static void game_lost(void)
 	init_game();
 }
 
-static void advance(void)
+void
+advance(void)
 {
+	int i;
 	struct point head = position[head_pos];
 
-	if (!score)
-		score = 1;
-	
+	started = 1;
+
 	if (direction == LEFT || direction == RIGHT)
-		timeout(difficulty - (unsigned) level * 3);	
+		timeout(speed - (unsigned) level() * 3);
 	else
-		timeout(difficulty * 2 - (unsigned) level * 6);	
+		timeout(speed * 2 - (unsigned) level() * 6);
 
 	switch (direction) {
-	case UP: 
+	case UP:
 		head.y -= 1;
 		if (head.y < 0)
 			head.y = size.y - 1;
 		break;
-	case DOWN: 
+	case DOWN:
 		head.y += 1;
 		if (head.y == size.y)
 			head.y = 0;
 		break;
-	case LEFT: 
+	case LEFT:
 		head.x -= 1;
 		if (head.x < 0)
 			head.x = size.x - 1;
@@ -298,23 +250,23 @@ static void advance(void)
 	switch (screen[head.y][head.x]) {
 	case SPACE:
 		add_head(head);
-		remove_tail();		
-		break;		
+		remove_tail();
+		break;
 	case SUPER_POWERUP:
-		for (int i = 0; i < 15; i++)
+		for (i = 0; i < super_powerup_grow - powerup_grow; i++)
 			dup_tail();
 		/* fall-thru */
 	case POWERUP:
+		for (i = 1; i < powerup_grow; i++)
+			dup_tail();
 		add_head(head);
 		add_powerup();
 		length++;
-		score++;		
 		break;
 	case BOMB:
 		add_head(head);
 		remove_tail();
-		score -= 35;
-		for (int i = 0; i < 25; i++) {
+		for (i = 0; i < bomb_decrease; i++) {
 			remove_tail();
 			if (--length == 0)
 				break;
@@ -322,24 +274,24 @@ static void advance(void)
 		if (length)
 			break;
 		/* fall-thru */
-	default: 
+	default:
 		add_head(head);
 		remove_tail();
-		for (int i = 0; i < 5; i++) {
-			screen[head.y][head.x] = SUPER_POWERUP;		
-			print_screen();			
-			usleep(140000);	
+		for (i = 0; i < 5; i++) {
+			screen[head.y][head.x] = SUPER_POWERUP;
+			refresh_screen();
+			usleep(140000);
 			screen[head.y][head.x] = SNAKE_HEAD;
-			print_screen();
-			usleep(140000);		
+			refresh_screen();
+			usleep(140000);
 		}
 		game_lost();
 	}
-	print_screen();
-	level = score / 30;
+	refresh_screen();
 }
 
-static void confirm_exit(void)
+void
+confirm_exit(void)
 {
 	int ch;
 
@@ -353,92 +305,65 @@ static void confirm_exit(void)
 	advance();
 }
 
-static void parse_cmdline(int argc, char* argv[])
+void
+init_curses(void)
 {
-	int ch;
+	initscr();
+	cbreak();
+	keypad(stdscr, 1);
+	noecho();
+	curs_set(0);
 
-	while ((ch = getopt(argc, argv, "hvnd:")) != -1) {
-		switch (ch) {
-		case 'h': 
-			puts(USAGE);
-			exit(EXIT_SUCCESS);
-		case 'v': 
-			puts(VERSIONSTRING);
-			exit(EXIT_SUCCESS);
-		case 'n':
-			limit = false;
-			break;
-		case 'd': 
-			switch (optarg[0]) {
-			case 'e': difficulty = EASY; break;
-			case 'm': difficulty = MEDIUM; break;
-			case 'h': difficulty = HARD; break;
-			default: 
-				puts("Invalid difficulty, allowed values: (e)asy, (m)edium, (h)ard"); 
-				exit(EXIT_FAILURE);
-			}
-			break;
-		default:
-			puts(USAGE);
-			exit(EXIT_FAILURE);
-		}
-	}
+	use_default_colors();
+	start_color();
+	init_color_pairs();
+
+	atexit((void(*)(void)) endwin);
 }
 
-_Noreturn static void main_loop(void) 
+int
+main(void)
 {
-	while (true) {
+	int i;
+
+	srand((unsigned) time(NULL));
+	init_curses();
+	init_game();
+
+	for (;;) {
 		switch (getch()) {
-		case KEY_UP: 
-			if (direction != DOWN || !score)
+		case 'k':
+		case KEY_UP:
+			if (direction != DOWN || !started)
 				direction = UP;
 			break;
+		case 'j':
 		case KEY_DOWN:
-			if (direction != UP || !score)
+			if (direction != UP || !started)
 				direction = DOWN;
 			break;
+		case 'h':
 		case KEY_LEFT:
-			if (direction != RIGHT || !score)
+			if (direction != RIGHT || !started)
 				direction = LEFT;
 			break;
+		case 'l':
 		case KEY_RIGHT:
-			if (direction != LEFT || !score)
+			if (direction != LEFT || !started)
 				direction = RIGHT;
 			break;
-		case SPACE: 
-			for (int i = 0; i < 5; i++) {
+		case SPACE:
+			for (i = 0; i < 5; i++)
 				advance();
-				usleep(10000);
-			}
 			break;
-		case 'p': 
+		case 'p':
 			print_center(0, "Game paused - press 'p' to resume");
 			while (getch() != 'p')
-				/* wait */;
+				continue;
 			break;
-		case 'q': 
+		case 'q':
 			confirm_exit();
 		}
 		advance();
 	}
-}
-
-static void init_curses(void)
-{
-	initscr();
-	cbreak();
-	keypad(stdscr, true);
-	noecho();
-	curs_set(false);
-}
-
-int main(int argc, char *argv[]) 
-{
-	srand((unsigned) time(NULL));
-	load_score();
-	parse_cmdline(argc, argv);
-	init_curses();	
-	init_game();
-	atexit(quit_game);
-	main_loop();	
 }
