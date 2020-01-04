@@ -214,7 +214,7 @@ game_lost(void)
 void
 advance(void)
 {
-	int i;
+	int i, tmp;
 	struct point head = position[head_pos];
 
 	started = 1;
@@ -275,16 +275,18 @@ advance(void)
 			break;
 		/* fall-thru */
 	default:
+		tmp = screen[head.y][head.x];
 		add_head(head);
 		remove_tail();
 		for (i = 0; i < 5; i++) {
-			screen[head.y][head.x] = SUPER_POWERUP;
-			refresh_screen();
-			usleep(140000);
 			screen[head.y][head.x] = SNAKE_HEAD;
 			refresh_screen();
 			usleep(140000);
+			screen[head.y][head.x] = tmp;
+			refresh_screen();
+			usleep(140000);
 		}
+		screen[head.y][head.x] = SNAKE_HEAD;
 		game_lost();
 	}
 	refresh_screen();
