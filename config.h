@@ -49,7 +49,7 @@ enum {
 
 /* here you can change the color used in the game */
 void
-init_color_pairs()
+init_color_pairs(void)
 {
 	init_pair(COLOR_HEAD, COLOR_BLUE, -1);
 	init_pair(COLOR_BODY, COLOR_CYAN, -1);
@@ -60,7 +60,7 @@ init_color_pairs()
 
 /* change the way the next level is computed */ 
 int
-level()
+level(void)
 {
 	return length / 30;	
 }
